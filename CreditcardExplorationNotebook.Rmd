@@ -1,0 +1,354 @@
+---
+title: "Creditcard Analysis"
+author: DccLxxVii
+date: November 26, 2019
+output:
+  prettydoc::html_pretty:
+    toc: true
+    smooth_scroll: true
+    collapsed: false
+    highlight: tango
+    theme: cayman
+---
+
+# Load libraries
+***
+
+```{r warning = FALSE, message=FALSE}
+
+suppressMessages(library(reshape2))
+# suppressMessages(library(tidyverse))
+suppressMessages(library(DataExplorer))
+suppressMessages(library(ggplot2))
+suppressMessages(library("gridExtra"))
+library(grid)
+library(ggplot2)
+library(dplyr)
+library(readr)
+```
+
+
+# 1. INTRODUCTION
+***
+
+Data Science assignment: EDA, Clustering and ANN
+
+### DATA INTRODUCTION (SOURCE:KAGGLE)
+***
+
+The dataset contains transactions made by credit cards in September 2013 by European cardholders. This dataset presents transactions that occurred in two days, where we have 492 frauds out of 284,807 transactions. The dataset is highly unbalanced, the positive class (frauds) account for 0.172% of all transactions.
+
+It contains only numerical input variables which are the result of a PCA transformation. Unfortunately, due to confidentiality issues, we cannot provide the original features and more background information about the data. Features V1, V2, ... V28 are the principal components obtained with PCA, the only features which have not been transformed with PCA are 'Time' and 'Amount'. Feature 'Time' contains the seconds elapsed between each transaction and the first transaction in the dataset. The feature 'Amount' is the transaction Amount, this feature can be used for example-dependant cost-senstive learning. Feature 'Class' is the response variable and it takes value 1 in case of fraud and 0 otherwise.
+
+
+# 2. METHODS
+***
+
+## EXPLORATORY DATA ANALYSIS (EDA)
+***
+
+#### 1. Loading Data
+***
+
+```{r message = FALSE, warning=FALSE}
+CC_Data <- read_csv("creditcard.csv")
+```
+
+
+##### 1a. Checking for missing values
+***
+
+Lets see if the data has missing values
+
+```{r}
+introduce(CC_Data)
+
+```
+
+```{r}
+plot_intro(CC_Data)
+```
+
+- There is only one missing value, lets see which variable has that missing value
+
+##### Determining the missing value
+***
+```{r}
+for (Var in names(CC_Data)) {
+    missing <- sum(is.na(CC_Data[,Var]))
+    if (missing > 0) {
+        print(c(Var,missing))
+    }
+}
+```
+
+- So the Time variable has one missing value. Rest of the data is complete.
+
+
+##### 1b. Checking for constant features
+***
+
+```{r}
+flag <- FALSE
+
+for (f in names(CC_Data)) {
+  if (length(unique(CC_Data[[f]])) == 1) {
+    cat(f, "\n")
+     flag <- TRUE
+  }
+}
+
+if (flag == FALSE){
+     print ("no variable found to be constant")
+}
+```
+
+
+
+##### 1c. Checking for equal columns
+***
+
+```{r}
+flag <- FALSE
+features_pair <- combn(names(CC_Data), 2, simplify = F)
+for(pair in features_pair) {
+  f1 <- pair[1]
+  f2 <- pair[2]
+  
+      if (all(CC_Data[[f1]] == CC_Data[[f2]])) {
+      cat(f1, "and", f2, "are equals.\n")
+           flag <- TRUE
+    }
+}
+
+if (flag == FALSE){
+     print ("No variables found as equal")
+}
+```
+
+
+##### 1d. Data cleansing
+***
+```{r}
+CC_Data=na.omit((CC_Data))
+```
+
+
+#### 2. Summary Statistics
+***
+First lets look at the summary statistics of all variable
+
+```{r}
+summary(CC_Data)
+```
+
+- All masked variables are already PCA transformed and therefore have a mean of 0
+
+- It will be interesting to see how these values differ across the 
+
+
+##### Factoring the Class variable
+***
+```{r}
+# Creating factor
+CC_Data <- CC_Data %>% 
+     mutate(Class = as.factor(Class)) 
+levels(CC_Data$Class) <- c('Normal', 'Fraud')
+
+#ploting
+table(CC_Data$Class)
+
+
+```
+
+```{r}
+ggplot(CC_Data)+
+     geom_bar(aes(x = Class, fill = Class))+ggtitle("Normal vs Fraudulent Transactions")
+```
+
+- The data is highly unbalanced as there are 492 fraud transactions compared to 284,315 clean transactions
+
+
+#####Creating two separate data sets for Fraud and Clean transactions
+***
+```{r}
+fraudData <- subset(CC_Data,Class=='Fraud')
+notFraudData <- subset(CC_Data,Class=='Normal')
+```
+
+
+#### 3. Exploring if Fraud Transactions occur at specific time?
+***
+
+Time is defined as number of seconds elapsed between this transaction and the first transaction in the dataset
+
+```{r message = FALSE, warning=FALSE}
+# create new variable: night, based on Time variable
+CC_Data_time<-na.omit(read_csv("creditcard.csv"))
+CC_Data_time$Night <- as.factor((floor(CC_Data_time$Time/60/60)%%24 <= 9)*1)
+```
+
+
+#### Transactions divided per time of day
+***
+```{r message = FALSE, warning=FALSE}
+toPlot <- CC_Data_time
+toPlot$factClass <- as.factor(CC_Data_time$Class)
+toPlot <- table(toPlot$Night, toPlot$factClass)
+toPlot <- melt(toPlot)
+toPlot$value[toPlot$Var2==0] = toPlot$value[toPlot$Var2==0]/sum(toPlot$value[toPlot$Var2==0])
+toPlot$value[toPlot$Var2==1] = toPlot$value[toPlot$Var2==1]/sum(toPlot$value[toPlot$Var2==1])
+names(toPlot) <- c("IsNight", "Fraud", "Percentage")
+toPlot$Fraud <-as.factor(toPlot$Fraud)
+ggplot(toPlot, aes(x=Fraud, y=Percentage, fill=Fraud))+geom_bar(stat="identity")+
+  facet_grid(~IsNight)+
+  ggtitle("Division of transactions at day vs at night")+
+  scale_fill_discrete(name="Normal (0) | Fraud (1)")
+```
+
+- Fraud transactions are more likely to happen at night, comparing to normal transactions.
+
+- Normal transactions are more likely to happen during the day than during the night
+
+- Fraud transactions are more likely to happen during the day than during the night
+
+
+#### Normal and Fraud transactions variation over time
+***
+```{r message = FALSE, warning=FALSE}
+
+p1 <- ggplot(notFraudData, aes(x = Time)) +
+        geom_histogram(fill="light blue", colour = "black") + labs(title=expression("Normal Transactions"))
+
+p2 <- ggplot(fraudData, aes(x = Time)) +
+        geom_histogram(fill="light green", colour = "black") + labs(title=expression("Fraud Transactions"))
+
+p3 <- ggplot(data = CC_Data,aes(x=Time,fill=factor(Class)))+geom_density(alpha=0.5)+
+  geom_vline(aes(xintercept=mean(Time[Class=="Not Fraud"])),color="red",linetype="dashed",lwd=0.5)+
+  geom_vline(aes(xintercept=mean(Time[Class=="Fraud"])),color="blue",linetype="dashed",lwd=0.5)+ 
+       scale_x_continuous(breaks = seq(50000,100000,150000))+
+  xlab(label = "Time") +
+  ggtitle("Transaction time of Fraud and Normal transactions")+
+  theme_classic()
+
+grid.arrange(p3, p1, p2)
+```
+
+
+- We can clearly see that normal transactions follow a cyclical period. Therefore, if large number of transaction show up in low acitivity period it can raise an alarm
+
+
+
+
+#### 4. Exploring if Fraud Transactions are related with amount of transaction?
+***
+
+```{r message = FALSE, warning=FALSE}
+p3 <- ggplot(fraudData, aes(x = Amount)) +
+        geom_histogram(fill="light blue", colour = "black") + labs(title=expression("Fraud Transactions"))
+
+p4 <- ggplot(notFraudData, aes(x = Amount)) +
+        geom_histogram(fill="light green", colour = "black") + labs(title=expression("Normal Transactions"))
+
+grid.arrange(p3, p4)
+```
+
+- No particular insights here, most of the transactions appear to be of small amount for both fraud and clean transactions. Lets further look into it by looking at its percentiles
+
+#### Cumulative quintiles for Fraud and Normal transactions
+***
+```{r message = FALSE, warning=FALSE}
+##Normal Transactions
+quantile(notFraudData$Amount, seq(0, 1, by=.2))
+
+##Fraud Transactions
+quantile(fraudData$Amount, seq(0, 1, by=.2))
+```
+
+- Clearly 60% of the transactions are of amount less than ~$40. Lets zoom into the transactions under $50 to see if there is an anomaly between fraud and clean transactions 
+
+#### Cumulative % graphs for Normal and Fraud transaction amounts
+***
+```{r message = FALSE, warning=FALSE}
+tab <- melt(table(CC_Data$Amount[CC_Data$Class=='Normal']))
+tab$CummulativePercentage <- cumsum(tab$value) / sum(tab$value) # cumulative Frequency
+names(tab)[1] <- "Amount"
+p5 <- ggplot(tab[tab$Amount<50,], aes(x=Amount, y=CummulativePercentage, color=CummulativePercentage))+
+  geom_line()+ggtitle("Normal Transactions")
+
+tab <- melt(table(CC_Data$Amount[CC_Data$Class=='Fraud']))
+tab$CummulativePercentage <- cumsum(tab$value) / sum(tab$value)
+names(tab)[1] <- "Amount"
+p6 <- ggplot(tab[tab$Amount<50,], aes(x=Amount, y=CummulativePercentage, color=CummulativePercentage))+
+  geom_line()+ggtitle("Fraud Transactions")
+
+grid.arrange(p5, p6)
+```
+
+- No particular anomoly here. Based on histogram and cummulative frequency above, we can safely say that there is no anomaly based on amount of the transaction
+
+
+
+#### 5. Exploring if Fraud Transactions are related with amount and time of transaction?
+***
+
+```{r}
+
+p7<-ggplot(fraudData, aes(x=Time, y=Amount)) + 
+  geom_point(colour="blue") + ggtitle("Fraud Transactions")
+
+p8<-ggplot(notFraudData, aes(x=Time, y=Amount)) + 
+  geom_point(colour="green")+ggtitle("Normal Transactions")
+
+grid.arrange(p7, p8)
+```
+
+
+- Again, no particular anomaly here between fraud and normal transactions. 
+
+
+#### 6. Which variables explain the fraud transactions?
+***
+
+**We will use several methods to explore which variables can help in detecting the fraud transaction** 
+
+First,we need to look at the coorelation of all variablesto find a relation :
+
+##### Correlation map
+***
+```{r}
+plot_correlation(CC_Data, maxcat = 8L)
+```
+
+- None of the V1 to V28 PCA components have any correlation to each other. 
+- Little to no correlation between variables indicates that it is highly likely that ** data is pca transformed**
+- Time has some correlations with V components but not with Amount. 
+- Amount also has some correlations with V components but not with Time. 
+- Class has some positive and negative correlations with the V components but has no significant correlation with Time and Amount.
+
+##### Comparison of mean of variables by Fraud vs Normal transactions
+***
+```{r}
+skew <- sum(as.numeric(CC_Data$Class))/nrow(CC_Data)
+mugood <- apply(notFraudData[sample(rownames(notFraudData), size = as.integer(skew *nrow(CC_Data)), replace = T), -c(1, 30, 31)], 2, mean)
+muanom <- apply(fraudData[, -c(1, 30, 31)], 2, mean)
+plot(muanom, col = "blue", xlab = "Features", ylab = "Mean")
+lines(muanom, col = "blue", lwd = 2)
+points(mugood, col = "green")
+lines(mugood, col = "green", lwd = 2)
+legend("topright", legend = c("Normal", "Fraud"), lty = c(1,1), col = c("green", "blue"), lwd = c(2,2))
+```
+
+
+- Mean values of variables for fraud transactions are different than for normal transactions for most of the variables. 
+- Mean values for the normal transacitons dont differ.
+- Mean values for fraud transactions differ alot.
+
+**Let's look at the box plot for all the variables:**
+
+```{r}
+boxplot(CC_Data[2:29])
+```
+
+- It is worth noticing that V13, V15, V19, and maybe V24 look very symmetrical. We will look at them in detail below
+- Outliers appear to be a problem. However, outliers also help in detecting anomolies so we will not treat them. 
