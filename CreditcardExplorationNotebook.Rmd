@@ -25,6 +25,7 @@ library(grid)
 library(ggplot2)
 library(dplyr)
 library(readr)
+library("NbClust")
 ```
 
 
@@ -51,7 +52,7 @@ It contains only numerical input variables which are the result of a PCA transfo
 ***
 
 ```{r message = FALSE, warning=FALSE}
-CC_Data <- read_csv("creditcard.csv")
+CC_Data <- read_csv("/home/dcclxxvii/Data/creditcard.csv")
 ```
 
 
@@ -184,7 +185,7 @@ Time is defined as number of seconds elapsed between this transaction and the fi
 
 ```{r message = FALSE, warning=FALSE}
 # create new variable: night, based on Time variable
-CC_Data_time<-na.omit(read_csv("creditcard.csv"))
+CC_Data_time<-na.omit(read_csv("/home/dcclxxvii/Data/creditcard.csv"))
 CC_Data_time$Night <- as.factor((floor(CC_Data_time$Time/60/60)%%24 <= 9)*1)
 ```
 
@@ -352,3 +353,76 @@ boxplot(CC_Data[2:29])
 
 - It is worth noticing that V13, V15, V19, and maybe V24 look very symmetrical. We will look at them in detail below
 - Outliers appear to be a problem. However, outliers also help in detecting anomolies so we will not treat them. 
+
+# 3. K-Means Clustering
+
+#### Data Preparation
+
+- To prepare the dataset for clustering, we center and scale the columns using scale(x, center = TRUE, scale = TRUE), where x is a matrix or dataframe.
+
+```{r}
+CC_Data <- read_csv("/home/dcclxxvii/Data/creditcard.csv")
+CC_Data <- CC_Data[1:1000,]
+
+head(CC_Data, n=3)
+
+```
+```{r}
+CC_Data_scale <- scale(CC_Data[-1])
+
+head(CC_Data_scale, n=3)
+```
+
+#### Dtermine OPtimal Number of Columns
+
+```{r}
+wssplot <- function(data, nc=15, seed=1234){
+               wss <- (nrow(data)-1)*sum(apply(data,2,var))
+               for (i in 2:nc){
+                    set.seed(seed)
+                    wss[i] <- sum(kmeans(data, centers=i)$withinss)}
+                plot(1:nc, wss, type="b", xlab="Number of Clusters",
+                     ylab="Within groups sum of squares")}
+
+wssplot(CC_Data_scale)
+```
+
+#### Deterimine optimal number of clusters
+-NbClust() is used to determine the best clustering scheme from the different results obtained by varying all combinations of number of clusters and distance methods.
+
+```{r}
+set.seed(1234)
+nc <- NbClust(CC_Data_scale, min.nc=2, max.nc=15, method="kmeans")
+```
+
+-In these two figures, Dindex refers to the Dunn index. Higher Dunn index values indicate better clustering.
+
+-Optimal number of clusters is determined as the number of clusters selected by the highest number of criteria. This can be visualized as a barplot:
+
+```{r}
+barplot(table(nc$Best.n[1,]),
+          xlab="Numer of Clusters", ylab="Number of Criteria",
+          main="Number of Clusters Chosen by 26 Criteria")
+```
+#### K-means cluster analysis
+-kmeans() is used to obtain the final clustering solution.
+```{r}
+cc_km <- kmeans(CC_Data, 2, nstart=25)
+```
+
+-cc_km$size returns the number of items in each cluster
+
+```{r}
+cc_km$size
+```
+-cc_km$centers returns the central value for each cluster
+
+```{r}
+cc_km$centers
+```
+-As the centroids are quantified using the scaled data, the aggregate() function is used with the determined cluster memberships to quantify variable means for each cluster:
+
+```{r}
+aggregate(CC_Data[-1], by=list(cluster=cc_km$cluster),mean)
+```
+
