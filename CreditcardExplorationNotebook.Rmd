@@ -359,6 +359,7 @@ boxplot(CC_Data[2:29])
 #### Data Preparation
 
 - To prepare the dataset for clustering, we center and scale the columns using scale(x, center = TRUE, scale = TRUE), where x is a matrix or dataframe.
+-But first subsetting is required.
 
 ```{r}
 CC_Data <- read_csv("/home/dcclxxvii/Data/creditcard.csv")
@@ -425,4 +426,89 @@ cc_km$centers
 ```{r}
 aggregate(CC_Data[-1], by=list(cluster=cc_km$cluster),mean)
 ```
+
+# 4. ANN (Artificial Neural Network)
+
+- Load the neuralnet package into the system.
+```{r}
+library("neuralnet")
+```
+-Use the scaled data
+
+
+-The following code splits the dataset into a training set consisting of  70% of the data and a test set containing 30% of the data.
+
+```{r}
+ind <- sample(2, nrow(CC_Data_scale), replace = TRUE, prob = c(0.7, 0.3))
+train.data <- as.data.frame(CC_Data_scale[ind == 1, ])
+test.data <- as.data.frame(CC_Data_scale[ind == 2, ])
+```
+
+-This command implements the neural network method on training data using  class as the dependent variable and all other variables as independent variables.  We use one hidden layer with 2 nodes, and linear output set tofalse for classification models.
+
+```{r}
+nn <- neuralnet(formula = Class ~ V1 + V3 + V15 + V18 + V11 + V12 +V5, 
+                data = train.data, hidden = 2, linear.output = FALSE)
+```
+-Summary of the model
+```{r}
+summary(nn)
+```
+
+-We will examine the following properties: the response values, result matrix, and net result probabilities.
+-Show the values of the dependent variable for the first 21 observations.
+```{r}
+nn$response[1:21]
+```
+
+
+
+-Show the probability for the first 21 records.
+```{r}
+nn$net.result[[1]][1:21]
+```
+
+-Show the network result matrix, which includes information on the number of training steps, the error, and the weights.
+```{r}
+nn$result.matrix
+```
+
+-Create a visualization of the neural network.
+```{r}
+plot(nn)
+```
+
+
+- Compute the predicted values for the training set
+
+```{r}
+mypredict <- compute(nn, nn$covariate)$net.result
+mypredict <- apply(mypredict, c(1), round)
+
+```
+
+-Show the first 21 predicted values.
+```{r}
+mypredict[1:21]
+```
+
+-Create the confusion matrix on the training data.
+```{r}
+table(mypredict, train.data$Class, dnn = c("Predicted", "Actual"))
+```
+-Computes the predicted values for the test set and rounds them to the nearest integer (either 0 or 1).
+
+```{r}
+testPred <- compute(nn, test.data)$net.result
+testPred <- apply(testPred, c(1), round)
+```
+
+-Create the confusion matrix on the test data.
+
+```{r}
+
+table(testPred, test.data$Class, dnn = c("Predicted", "Actual"))
+
+```
+
 
