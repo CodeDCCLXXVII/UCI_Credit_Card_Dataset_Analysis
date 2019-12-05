@@ -59,6 +59,24 @@ CC_Data <- read_csv("/home/dcclxxvii/Data/creditcard.csv")
 ##### 1a. Checking for missing values
 ***
 
+View head
+```{r}
+head(CC_Data)
+```
+
+View tail
+```{r}
+tail(CC_Data)
+```
+
+
+View Columns
+
+```{r}
+names(CC_Data)
+```
+
+Advances in viewing the data summary
 Lets see if the data has missing values
 
 ```{r}

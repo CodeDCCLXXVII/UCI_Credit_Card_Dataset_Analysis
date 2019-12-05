@@ -13,7 +13,7 @@ tail(C_Data)
 #Get summary
 summary(C_Data)
 
-# Get Columns
+# Get Columns   
 names(C_Data)
 # Get deeper analysis
 install.packages("psych")
