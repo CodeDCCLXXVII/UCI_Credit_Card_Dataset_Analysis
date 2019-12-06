@@ -154,7 +154,7 @@ if (flag == FALSE){
 ##### 1d. Data cleansing
 ***
 ```{r}
-CC_Data=na.omit((CC_Data))
+CC_Data <- na.omit((CC_Data))
 ```
 
 
@@ -546,6 +546,11 @@ mypredict[1:21]
 ```{r}
 table(mypredict, train.data$Class, dnn = c("Predicted", "Actual"))
 ```
+
+-True Negative = 6977
+-True Positive = 29
+-False Positive = 0
+-False Negative= 1
 -Computes the predicted values for the test set and rounds them to the nearest integer (either 0 or 1).
 
 ```{r}
@@ -560,5 +565,8 @@ testPred <- apply(testPred, c(1), round)
 table(testPred, test.data$Class, dnn = c("Predicted", "Actual"))
 
 ```
-
+-True Negative = 2985
+-True Positive = 8
+-False Positive = 0
+-False Negative = 0
 
