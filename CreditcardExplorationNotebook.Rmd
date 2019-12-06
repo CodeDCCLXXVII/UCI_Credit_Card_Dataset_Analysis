@@ -19,13 +19,18 @@ output:
 suppressMessages(library(reshape2))
 # suppressMessages(library(tidyverse))
 suppressMessages(library(DataExplorer))
+#for pretty visualization
 suppressMessages(library(ggplot2))
 suppressMessages(library("gridExtra"))
 library(grid)
 library(ggplot2)
 library(dplyr)
 library(readr)
+#for identifying optimal number of clusters
 library("NbClust")
+
+#cluster visualization
+library("cluster")
 ```
 
 
@@ -381,15 +386,15 @@ boxplot(CC_Data[2:29])
 
 ```{r}
 CC_Data <- read_csv("/home/dcclxxvii/Data/creditcard.csv")
-CC_Data <- CC_Data[1:1000,]
+CC_Data_cluster_analysis <- CC_Data[1:1000,]
 
-head(CC_Data, n=3)
+head(CC_Data_cluster_analysis, n=3)
 
 ```
 ```{r}
-CC_Data_scale <- scale(CC_Data[-1])
+CC_Data_scale <- scale(CC_Data_cluster_analysis)
 
-head(CC_Data_scale, n=3)
+head(CC_Data_cluster_analysis, n=3)
 ```
 
 #### Dtermine OPtimal Number of Columns
@@ -423,10 +428,22 @@ barplot(table(nc$Best.n[1,]),
           xlab="Numer of Clusters", ylab="Number of Criteria",
           main="Number of Clusters Chosen by 26 Criteria")
 ```
+- 2 Is the optimal number of cluster to have
+
 #### K-means cluster analysis
 -kmeans() is used to obtain the final clustering solution.
 ```{r}
 cc_km <- kmeans(CC_Data, 2, nstart=25)
+```
+
+-view cluster details
+```{r}
+str(cc_km)
+```
+
+-cluster summary
+```{r}
+summary(cc_km)
 ```
 
 -cc_km$size returns the number of items in each cluster
@@ -445,6 +462,12 @@ cc_km$centers
 aggregate(CC_Data[-1], by=list(cluster=cc_km$cluster),mean)
 ```
 
+-plot the cluster
+
+```{r}
+clusplot(CC_Data, cc_km$cluster)
+```
+
 # 4. ANN (Artificial Neural Network)
 
 - Load the neuralnet package into the system.
@@ -452,20 +475,29 @@ aggregate(CC_Data[-1], by=list(cluster=cc_km$cluster),mean)
 library("neuralnet")
 ```
 -Use the scaled data
+```{r}
+CC_Data_nn_scaled<- CC_Data[1:10000,]
+```
+
+-summary of scaled data for ANN
+```{r}
+summary(CC_Data_nn_scaled)
+```
 
 
 -The following code splits the dataset into a training set consisting of  70% of the data and a test set containing 30% of the data.
 
 ```{r}
-ind <- sample(2, nrow(CC_Data_scale), replace = TRUE, prob = c(0.7, 0.3))
-train.data <- as.data.frame(CC_Data_scale[ind == 1, ])
-test.data <- as.data.frame(CC_Data_scale[ind == 2, ])
+ind <- sample(2, nrow(CC_Data_nn_scaled), replace = TRUE, prob = c(0.7, 0.3))
+train.data <- as.data.frame(CC_Data_nn_scaled[ind == 1, ])
+test.data <- as.data.frame(CC_Data_nn_scaled[ind == 2, ])
 ```
 
 -This command implements the neural network method on training data using  class as the dependent variable and all other variables as independent variables.  We use one hidden layer with 2 nodes, and linear output set tofalse for classification models.
+- From the analysis of the variable correaltion with the fraud class we chose only those which showed correlation
 
 ```{r}
-nn <- neuralnet(formula = Class ~ V1 + V3 + V15 + V18 + V11 + V12 +V5, 
+nn <- neuralnet(formula = Class ~ V1 + V3 + V4 + V6 + V9 + V10 + V11 + V12 + V14 + V16 + V18,  
                 data = train.data, hidden = 2, linear.output = FALSE)
 ```
 -Summary of the model
